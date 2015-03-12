@@ -1,12 +1,26 @@
 #ifndef DATAPOINT_H
 #define DATAPOINT_H
 
+#include <QVector4D>
+#include <QVector3D>
 
-class DataPoint
+class DataPoint : protected QVector4D
 {
-public:
+private:
+    QVector3D projected;
     DataPoint();
+public:
+    DataPoint(float d1, float d2, float d3, float d4);
     ~DataPoint();
+
+    void project(const QVector3D&,
+                 const QVector3D&,
+                 const QVector3D&,
+                 const QVector3D&);
+
+    float projectedX() { return projected.x(); }
+    float projectedY() { return projected.y(); }
+    float projectedZ() { return projected.z(); }
 };
 
 #endif // DATAPOINT_H
