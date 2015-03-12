@@ -3,51 +3,6 @@
 #include <QtCore/qmath.h>
 #include <QtGui/QMatrix4x4>
 
-struct BezierCurve {
-    GLfloat * vertices;
-    GLfloat * colors;
-    int size;
-
-    ~BezierCurve();
-};
-
-BezierCurve calcCurve(QVector3D &init, QVector3D &end, QVector3D &control, int resolution) {
-    BezierCurve curve;
-    curve.size = resolution + 1;
-    curve.vertices = (decltype(curve.vertices))malloc(3 * sizeof *curve.vertices * curve.size);
-    curve.colors = (decltype(curve.colors))malloc(3 * sizeof *curve.colors * curve.size);
-    float t;
-    QVector3D p1;
-    QVector3D p2;
-    QVector3D result;
-
-    QVector3D color1(0.0f / 255.0f, 0.0f / 255.0f, 255.0f / 255.0f);
-    QVector3D color2(255.0f / 255.0f, 0.0f / 255.0f, 0.0f / 255.0f);
-    QVector3D colorT;
-
-    for (int i = 0; i < curve.size; i++) {
-        t = (float)i / (curve.size - 1);
-        p1 = ((1 - t) * init) + (t * control);
-        p2 = ((1 - t) * control) + (t * end);
-        result = ((1 - t) * p1) + (t * p2);
-        curve.vertices[3*i] = result.x();
-        curve.vertices[3*i+1] = result.y();
-        curve.vertices[3*i+2] = result.z();
-
-        colorT = ((1 - t) * color1) + (t * color2);
-        curve.colors[3*i] = colorT.x();
-        curve.colors[3*i+1] = colorT.y();
-        curve.colors[3*i+2] = colorT.z();
-    }
-
-    return curve;
-}
-
-BezierCurve::~BezierCurve() {
-    free(vertices);
-    free(colors);
-}
-
 static const char *vertexShaderSource =
     "attribute highp vec4 posAttr;\n"
     "attribute lowp vec4 colAttr;\n"
@@ -65,7 +20,8 @@ static const char *fragmentShaderSource =
     "}\n";
 
 TrajectoryWindow::TrajectoryWindow()
-    : m_program(0)
+    : m_traj(NULL)
+    , m_program(0)
     , m_frame(0)
     , m_rotationVector(1.0f, 1.0f, 1.0f)
 {}
@@ -94,6 +50,10 @@ void TrajectoryWindow::setRotationV4() {
     m_rotationVector.setZ(1.0f);
 }
 
+void TrajectoryWindow::bindTrajectory(BarycentricTrajectory &traj) {
+    m_traj = &traj;
+}
+
 void TrajectoryWindow::keyPressEvent(QKeyEvent * k) {
     switch (k->key()) {
     case Qt::Key_Q:
@@ -107,6 +67,9 @@ void TrajectoryWindow::keyPressEvent(QKeyEvent * k) {
         break;
     case Qt::Key_R:
         setRotationV4();
+        break;
+     case Qt::Key_Space:
+        if (animating()) { setAnimating(false); } else { setAnimating(true); }
         break;
     default:
         break;
@@ -146,7 +109,7 @@ void TrajectoryWindow::render()
     m_program->bind();
 
     QMatrix4x4 matrix;
-    matrix.perspective(90.0f, 1.0f/1.0f, 0.1f, 100.0f);
+    matrix.perspective(60.0f, 1.0f/1.0f, 0.1f, 100.0f);
     matrix.translate(0, 0, -4);
     matrix.rotate(10.0f * m_frame / screen()->refreshRate(), m_rotationVector);
 
@@ -185,23 +148,18 @@ void TrajectoryWindow::render()
 
     free(colors);
 
-    QVector3D v1(1.0f, 1.0f, 1.0f);
-    QVector3D v2(1.0f, -1.0f, -1.0f);
-    QVector3D v3(0.0f, 0.0f, 0.0f);
+    if (m_traj != NULL) {
+        glVertexAttribPointer(m_posAttr, 3, GL_FLOAT, GL_FALSE, 0, m_traj->vertices());
+        glVertexAttribPointer(m_colAttr, 3, GL_FLOAT, GL_FALSE, 0, m_traj->colors());
 
-    BezierCurve curve = calcCurve(v1, v2, v3, 200);
-    glVertexAttribPointer(m_posAttr, 3, GL_FLOAT, GL_FALSE, 0, curve.vertices);
-    glVertexAttribPointer(m_colAttr, 3, GL_FLOAT, GL_FALSE, 0, curve.colors);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glLineWidth(m_traj->width());
 
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-
-    glLineWidth(4.0);
-
-    glDrawArrays(GL_LINE_STRIP, 0, curve.size);
-
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(0);
+        glDrawArrays(GL_LINE_STRIP, 0, m_traj->nVertices());
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(0);
+    }
 
     m_program->release();
 

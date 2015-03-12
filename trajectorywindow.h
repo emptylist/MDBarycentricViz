@@ -2,6 +2,7 @@
 #define TRAJECTORYWINDOW_H
 
 #include "openglwindow.h"
+#include "barycentrictrajectory.h"
 #include <QtGui/QOpenGLShaderProgram>
 #include <QtGui/QKeyEvent>
 
@@ -9,6 +10,18 @@
 
 class TrajectoryWindow : public OpenGLWindow
 {
+private:
+    BarycentricTrajectory * m_traj;
+    GLuint loadShader(GLenum type, const char *source);
+
+    GLuint m_posAttr;
+    GLuint m_colAttr;
+    GLuint m_matrixUniform;
+
+    QOpenGLShaderProgram *m_program;
+    int m_frame;
+
+    QVector3D m_rotationVector;
 public:
     TrajectoryWindow();
 
@@ -22,16 +35,7 @@ public:
 
     void keyPressEvent(QKeyEvent *);
 
-private:
-    GLuint loadShader(GLenum type, const char *source);
-
-    GLuint m_posAttr;
-    GLuint m_colAttr;
-    GLuint m_matrixUniform;
-
-    QOpenGLShaderProgram *m_program;
-    int m_frame;
-    QVector3D m_rotationVector;
+    void bindTrajectory(BarycentricTrajectory&);
 };
 
 

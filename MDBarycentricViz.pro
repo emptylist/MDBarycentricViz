@@ -6,7 +6,8 @@ HEADERS += \
     openglwindow.h \
     datapoint.h \
     barycentrictrajectory.h \
-    trajectorywindow.h
+    trajectorywindow.h \
+    beziercurve.h
 
 SOURCES += \
     openglwindow.cpp \

@@ -23,7 +23,7 @@ public:
     virtual void initialize();
 
     void setAnimating(bool animating);
-
+    bool animating() { return m_animating; }
 public slots:
     void renderLater();
     void renderNow();

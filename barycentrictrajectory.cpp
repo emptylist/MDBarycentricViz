@@ -1,12 +1,20 @@
 #include "barycentrictrajectory.h"
+#include "beziercurve.h"
 
-BarycentricTrajectory::BarycentricTrajectory() :
-    m_v1(1.0f, 1.0f, 1.0f),
-    m_v2(1.0f, -1.0f, -1.0f),
-    m_v3(-1.0f, 1.0f, 1.0f),
-    m_v4(-1.0f, -1.0f, 1.0f),
-    f_projected(false),
-    f_verticesCached(false)
+BarycentricTrajectory::BarycentricTrajectory()
+    : m_v1(1.0f, 1.0f, 1.0f)
+    , m_v2(1.0f, -1.0f, -1.0f)
+    , m_v3(-1.0f, 1.0f, -1.0f)
+    , m_v4(-1.0f, -1.0f, 1.0f)
+    , m_color1(1.0f, 0.0f, 0.0f)
+    , m_color2(0.0f, 0.0f, 1.0f)
+    , m_vertices(NULL)
+    , m_colors(NULL)
+    , m_nVertices(0)
+    , m_nColors(0)
+    , m_lineWidth(2.0)
+    , f_projected(false)
+    , f_verticesCached(false)
 {}
 
 BarycentricTrajectory::~BarycentricTrajectory() {
@@ -29,7 +37,7 @@ void BarycentricTrajectory::newFrame(float d1, float d2, float d3, float d4) {
     f_verticesCached = false;
 }
 
-const DataPoint& BarycentricTrajectory::operator[] (size_t idx) {
+const DataPoint& BarycentricTrajectory::operator[] (size_t idx) const {
     return *(frames[idx]);
 }
 
@@ -53,26 +61,56 @@ void BarycentricTrajectory::v4(const QVector3D &v) {
     f_projected = false;
 }
 
-const GLfloat * BarycentricTrajectory::vertices() {
-    if (!f_verticesCached) {
-        if (m_nVertices != frames.size()) {
-            // Oh noes!  C-style code!  Pointer arithmetic! MALLOC! The Horror!
-            free(m_vertices);
-            m_vertices = (decltype(m_vertices)) malloc(3 * sizeof(*m_vertices) * frames.size());
-        }
-        if (!f_projected) { project(); }
-        for (size_t idx = 0; idx < m_nVertices; idx++) {
-            m_vertices[3 * idx] = (GLfloat)(frames[idx]->projectedX());
-            m_vertices[(3 * idx) + 1] = (GLfloat)frames[idx]->projectedY();
-            m_vertices[(3 * idx) + 2] = (GLfloat)frames[idx]->projectedZ();
-
-        }
-        f_verticesCached = true;
+void BarycentricTrajectory::recalculateVertices() {
+    if (m_nVertices != frames.size()) {
+        if (m_vertices != NULL) { free(m_vertices); }
+        m_vertices = (decltype(m_vertices))malloc(3 * sizeof *m_vertices * frames.size());
+        f_colorsCached = false;
+        m_nVertices = frames.size();
     }
+    if (!f_projected) { project(); }
+    for (size_t idx = 0; idx < m_nVertices; idx++) {
+        m_vertices[3 * idx] = (GLfloat)(frames[idx]->projectedX());
+        m_vertices[(3 * idx) + 1] = (GLfloat)frames[idx]->projectedY();
+        m_vertices[(3 * idx) + 2] = (GLfloat)frames[idx]->projectedZ();
+    }
+    f_verticesCached = true;
+}
 
+const GLfloat * BarycentricTrajectory::vertices() {
+    if (!f_verticesCached) { recalculateVertices(); }
     return m_vertices;
 }
 
-size_t BarycentricTrajectory::nVertices() {
+void BarycentricTrajectory::recalculateColors() {
+    QVector3D tColor;
+    float t;
+
+    if (m_nColors != frames.size()) {
+        if (m_colors != NULL) { free(m_colors); }
+        m_colors = (decltype(m_colors))malloc(3 * sizeof *m_colors * frames.size());
+        m_nColors = frames.size();
+    }
+
+    /*
+    for (size_t idx = 0; idx < m_nColors; idx++) {
+        t = (float)idx / (float)(m_nColors - 1);
+        tColor = ((1-t) * m_color1) + (t * m_color2);
+        m_colors[3*idx] = tColor.x();
+        m_colors[(3*idx)+1] = tColor.y();
+        m_colors[(3*idx)+2] = tColor.z();
+    }
+    */
+    QVector3D green(0.0f, 2.0f, 0.0f);
+    BezierCurve curve = calcCurve(m_color1, m_color2, green, m_nColors);
+    memcpy(m_colors, curve.vertices, 3 * m_nColors * sizeof(float));
+}
+
+const GLfloat * BarycentricTrajectory::colors() {
+    if (!f_colorsCached) { recalculateColors(); }
+    return m_colors;
+}
+
+size_t BarycentricTrajectory::nVertices() const {
     return m_nVertices;
 }
