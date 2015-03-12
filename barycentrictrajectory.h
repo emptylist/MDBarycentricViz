@@ -17,8 +17,8 @@ private:
     GLfloat * m_vertices;
     size_t m_nVertices;
 
-    bool f_projected = false;
-    bool f_verticesCached = false;
+    bool f_projected;
+    bool f_verticesCached;
 
     void project();
 

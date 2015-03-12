@@ -5,10 +5,12 @@ CONFIG += c++11
 HEADERS += \
     openglwindow.h \
     datapoint.h \
-    barycentrictrajectory.h
+    barycentrictrajectory.h \
+    trajectorywindow.h
 
 SOURCES += \
     openglwindow.cpp \
     main.cpp \
     datapoint.cpp \
-    barycentrictrajectory.cpp
+    barycentrictrajectory.cpp \
+    trajectorywindow.cpp

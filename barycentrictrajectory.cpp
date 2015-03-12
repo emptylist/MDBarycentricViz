@@ -4,7 +4,9 @@ BarycentricTrajectory::BarycentricTrajectory() :
     m_v1(1.0f, 1.0f, 1.0f),
     m_v2(1.0f, -1.0f, -1.0f),
     m_v3(-1.0f, 1.0f, 1.0f),
-    m_v4(-1.0f, -1.0f, 1.0f)
+    m_v4(-1.0f, -1.0f, 1.0f),
+    f_projected(false),
+    f_verticesCached(false)
 {}
 
 BarycentricTrajectory::~BarycentricTrajectory() {
@@ -54,12 +56,12 @@ void BarycentricTrajectory::v4(const QVector3D &v) {
 const GLfloat * BarycentricTrajectory::vertices() {
     if (!f_verticesCached) {
         if (m_nVertices != frames.size()) {
+            // Oh noes!  C-style code!  Pointer arithmetic! MALLOC! The Horror!
             free(m_vertices);
-            m_vertices = (GLfloat *)malloc(3 * sizeof(GLfloat) * frames.size());
+            m_vertices = (decltype(m_vertices)) malloc(3 * sizeof(*m_vertices) * frames.size());
         }
         if (!f_projected) { project(); }
         for (size_t idx = 0; idx < m_nVertices; idx++) {
-            // Oh noes!  C-style code!  Pointer arithmetic! The horror!
             m_vertices[3 * idx] = (GLfloat)(frames[idx]->projectedX());
             m_vertices[(3 * idx) + 1] = (GLfloat)frames[idx]->projectedY();
             m_vertices[(3 * idx) + 2] = (GLfloat)frames[idx]->projectedZ();
