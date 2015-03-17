@@ -3,6 +3,10 @@
 #include <QtCore/qmath.h>
 #include <QtGui/QMatrix4x4>
 
+#include <iostream>
+#include <QImage>
+#include <QOpenGLFramebufferObject>
+
 static const char *vertexShaderSource =
     "attribute highp vec4 posAttr;\n"
     "attribute lowp vec4 colAttr;\n"
@@ -19,61 +23,77 @@ static const char *fragmentShaderSource =
     "   gl_FragColor = col;\n"
     "}\n";
 
-TrajectoryWindow::TrajectoryWindow()
-    : m_traj(NULL)
+TrajectoryWindow::TrajectoryWindow(QWidget *parent)
+    : QOpenGLWidget(parent)
+    , m_traj(NULL)
+    , m_zoom(60.0f)
     , m_program(0)
-    , m_frame(0)
-    , m_rotationVector(1.0f, 1.0f, 1.0f)
+    , m_xrot(0.0f)
+    , m_yrot(0.0f)
+    , m_zrot(0.0f)
+    , m_translateVector(0.0f, -0.50f, -4.0f)
+    , m_mouseModePan(false)
+    , m_mousePressed(false)
 {}
-
-void TrajectoryWindow::setRotationV1() {
-    m_rotationVector.setX(1.0f);
-    m_rotationVector.setY(1.0f);
-    m_rotationVector.setZ(1.0f);
-}
-
-void TrajectoryWindow::setRotationV2() {
-    m_rotationVector.setX(1.0f);
-    m_rotationVector.setY(-1.0f);
-    m_rotationVector.setZ(-1.0f);
-}
-
-void TrajectoryWindow::setRotationV3() {
-    m_rotationVector.setX(-1.0f);
-    m_rotationVector.setY(1.0f);
-    m_rotationVector.setZ(-1.0f);
-}
-
-void TrajectoryWindow::setRotationV4() {
-    m_rotationVector.setX(-1.0f);
-    m_rotationVector.setY(-1.0f);
-    m_rotationVector.setZ(1.0f);
-}
 
 void TrajectoryWindow::bindTrajectory(BarycentricTrajectory &traj) {
     m_traj = &traj;
 }
 
-void TrajectoryWindow::keyPressEvent(QKeyEvent * k) {
-    switch (k->key()) {
-    case Qt::Key_Q:
-        setRotationV1();
-        break;
-    case Qt::Key_W:
-        setRotationV2();
-        break;
-    case Qt::Key_E:
-        setRotationV3();
-        break;
-    case Qt::Key_R:
-        setRotationV4();
-        break;
-     case Qt::Key_Space:
-        if (animating()) { setAnimating(false); } else { setAnimating(true); }
-        break;
-    default:
-        break;
+void TrajectoryWindow::mouseMoveEvent(QMouseEvent *ev) {
+    if (m_mousePressed) {
+        if (!m_mouseModePan) {
+            m_xrot = fmod(m_xrot + (GLfloat)(ev->y() - m_mouseY) / 5.0f, 360.0f);
+            m_yrot = fmod(m_yrot + (GLfloat)(ev->x() - m_mouseX) / 5.0f, 360.0f);
+        } else {
+            m_translateVector.setX(m_translateVector.x() + (GLfloat)(ev->x() - m_mouseX) / 100.0f);
+            m_translateVector.setY(m_translateVector.y() - (GLfloat)(ev->y() - m_mouseY) / 100.0f);
+        }
+        m_mouseX = ev->x();
+        m_mouseY = ev->y();
     }
+    update();
+}
+
+void TrajectoryWindow::mousePressEvent(QMouseEvent *ev) {
+    m_mouseX = ev->x();
+    m_mouseY = ev->y();
+    m_mousePressed = true;
+}
+
+void TrajectoryWindow::mouseReleaseEvent(QMouseEvent *ev) {
+    Q_UNUSED(ev)
+    m_mousePressed = false;
+}
+
+void TrajectoryWindow::toggleTranslate() {
+    if (m_mouseModePan) {
+        m_mouseModePan = false;
+    } else { m_mouseModePan = true; }
+}
+
+void TrajectoryWindow::resetView() {
+    m_yrot = 0.0f;
+    m_xrot = 0.0f;
+    m_zrot = 0.0f;
+    m_translateVector = QVector3D(0.0f, 0.0f, -4.0f);
+    update();
+}
+
+void TrajectoryWindow::setZoom(GLfloat zoom) {
+    std::cout << zoom << std::endl;
+    if ((zoom > 10.0f) && (zoom < 170.0f)) {
+        m_zoom = zoom;
+    }
+    update();
+}
+
+GLfloat sgn(GLfloat val) { return val < 0.0f ? -1.0f : 1.0f; }
+
+void TrajectoryWindow::wheelEvent(QWheelEvent *ev) {
+    GLfloat zoomDelta = (GLfloat)ev->angleDelta().y() / 60.0f;
+    GLfloat zoomDeltaFinal = fabs(zoomDelta) < 5.0f ? zoomDelta : sgn(zoomDelta) * 5.0f;
+    setZoom(m_zoom - zoomDeltaFinal);
 }
 
 GLuint TrajectoryWindow::loadShader(GLenum type, const char *source)
@@ -84,8 +104,9 @@ GLuint TrajectoryWindow::loadShader(GLenum type, const char *source)
     return shader;
 }
 
-void TrajectoryWindow::initialize()
+void TrajectoryWindow::initializeGL()
 {
+    initializeOpenGLFunctions();
     m_program = new QOpenGLShaderProgram(this);
     m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource);
     m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource);
@@ -98,7 +119,12 @@ void TrajectoryWindow::initialize()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void TrajectoryWindow::render()
+void TrajectoryWindow::resizeGL(int w, int h) {
+    m_projection.setToIdentity();
+    m_projection.perspective(60.0f, w / float(h), 0.01f, 1000.0f);
+}
+
+void TrajectoryWindow::paintGL()
 {
     const qreal retinaScale = devicePixelRatio();
     glViewport(0, 0, width() * retinaScale, height() * retinaScale);
@@ -109,9 +135,11 @@ void TrajectoryWindow::render()
     m_program->bind();
 
     QMatrix4x4 matrix;
-    matrix.perspective(60.0f, 1.0f/1.0f, 0.1f, 100.0f);
-    matrix.translate(0, 0, -4);
-    matrix.rotate(10.0f * m_frame / screen()->refreshRate(), m_rotationVector);
+    matrix.perspective(m_zoom, 1.0f/1.0f, 0.1f, 100.0f);
+    matrix.translate(m_translateVector);
+    matrix.rotate(m_xrot, 1.0f, 0.0f, 0.0f);
+    matrix.rotate(m_yrot, 0.0f, 1.0f, 0.0f);
+    matrix.rotate(m_zrot, 0.0f, 0.0f, 1.0f);
 
     m_program->setUniformValue(m_matrixUniform, matrix);
 
@@ -126,13 +154,14 @@ void TrajectoryWindow::render()
         -1.0f, -1.0f, 1.0f
     };
 
-    GLfloat * colors = (GLfloat *)malloc(4 * sizeof(GLfloat) * 8);
+    GLfloat colors[4*8*sizeof(GLfloat)];
     for (int idx = 0; idx < 8; idx++) {
         colors[4*idx] = 0.0f;
         colors[(4*idx) + 1] = 0.0f;
         colors[(4*idx) + 2] = 0.0f;
         colors[(4*idx) + 3] = 1.0f;
     }
+
     glVertexAttribPointer(m_posAttr, 3, GL_FLOAT, GL_FALSE, 0, vertices);
     glVertexAttribPointer(m_colAttr, 4, GL_FLOAT, GL_FALSE, 0, colors);
 
@@ -146,7 +175,6 @@ void TrajectoryWindow::render()
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(0);
 
-    free(colors);
 
     if (m_traj != NULL) {
         glVertexAttribPointer(m_posAttr, 3, GL_FLOAT, GL_FALSE, 0, m_traj->vertices());
@@ -162,6 +190,53 @@ void TrajectoryWindow::render()
     }
 
     m_program->release();
-
-    ++m_frame;
 }
+
+void TrajectoryWindow::takeSnapshot() {
+    QOpenGLFramebufferObjectFormat fmt;
+    fmt.setSamples(16);
+    QOpenGLFramebufferObject fbo(width(), height(), fmt);
+    fbo.bind();
+    paintGL();
+    //glFlush();
+    //glReadBuffer(GL_FRONT);
+    QImage snapshot = fbo.toImage();
+    if (!snapshot.save("test.jpeg")) {
+        std::cout << "ERROR" << std::endl;
+    }
+    fbo.release();
+}
+
+
+/*
+void TrajectoryWindow::keyPressEvent(QKeyEvent * k) {
+    switch (k->key()) {
+    case Qt::Key_S:
+        m_xrot = fmod(m_xrot + 2.0f, 360.0f);
+        break;
+    case Qt::Key_W:
+        m_xrot = fmod(m_xrot - 2.0f, 360.0f);
+        break;
+    case Qt::Key_D:
+        m_yrot = fmod(m_yrot + 2.0f, 360.0f);
+        break;
+    case Qt::Key_A:
+        m_yrot = fmod(m_yrot - 2.0f, 360.0f);
+        break;
+    case Qt::Key_Q:
+        m_zrot = fmod(m_zrot + 2.0f, 360.0f);
+        break;
+    case Qt::Key_E:
+        m_zrot = fmod(m_zrot - 2.0f, 360.0f);
+        break;
+    case Qt::Key_Space:
+        resetView();
+        break;
+    case Qt::Key_T:
+        if (m_mouseModePan) { m_mouseModePan = false; } else { m_mouseModePan = true; }
+    default:
+        break;
+    }
+    update();
+}
+*/

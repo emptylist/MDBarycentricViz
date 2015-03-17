@@ -16,6 +16,7 @@ private:
 
     QVector3D m_color1;
     QVector3D m_color2;
+    QVector3D m_color3;
 
     std::vector<DataPoint *> frames;
     GLfloat * m_vertices;

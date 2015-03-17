@@ -1,4 +1,4 @@
-QT += core gui opengl
+QT += core widgets opengl gui
 
 CONFIG += c++11
 
@@ -7,11 +7,13 @@ HEADERS += \
     datapoint.h \
     barycentrictrajectory.h \
     trajectorywindow.h \
-    beziercurve.h
+    beziercurve.h \
+    mainwindow.h
 
 SOURCES += \
     openglwindow.cpp \
     main.cpp \
     datapoint.cpp \
     barycentrictrajectory.cpp \
-    trajectorywindow.cpp
+    trajectorywindow.cpp \
+    mainwindow.cpp

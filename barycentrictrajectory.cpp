@@ -8,6 +8,7 @@ BarycentricTrajectory::BarycentricTrajectory()
     , m_v4(-1.0f, -1.0f, 1.0f)
     , m_color1(1.0f, 0.0f, 0.0f)
     , m_color2(0.0f, 0.0f, 1.0f)
+    , m_color3(1.0f, 2.0f, 0.5f)
     , m_vertices(NULL)
     , m_colors(NULL)
     , m_nVertices(0)
@@ -19,8 +20,10 @@ BarycentricTrajectory::BarycentricTrajectory()
 
 BarycentricTrajectory::~BarycentricTrajectory() {
     for (auto it = frames.begin(); it != frames.end(); it++) {
-        delete[] *it;
+        delete *it;
     }
+    if (m_vertices != NULL) { free(m_vertices); }
+    if (m_colors != NULL) { free(m_colors); }
 }
 
 void BarycentricTrajectory::project() {
@@ -83,8 +86,6 @@ const GLfloat * BarycentricTrajectory::vertices() {
 }
 
 void BarycentricTrajectory::recalculateColors() {
-    QVector3D tColor;
-    float t;
 
     if (m_nColors != frames.size()) {
         if (m_colors != NULL) { free(m_colors); }
@@ -92,17 +93,7 @@ void BarycentricTrajectory::recalculateColors() {
         m_nColors = frames.size();
     }
 
-    /*
-    for (size_t idx = 0; idx < m_nColors; idx++) {
-        t = (float)idx / (float)(m_nColors - 1);
-        tColor = ((1-t) * m_color1) + (t * m_color2);
-        m_colors[3*idx] = tColor.x();
-        m_colors[(3*idx)+1] = tColor.y();
-        m_colors[(3*idx)+2] = tColor.z();
-    }
-    */
-    QVector3D green(0.0f, 2.0f, 0.0f);
-    BezierCurve curve = calcCurve(m_color1, m_color2, green, m_nColors);
+    BezierCurve curve = calcCurve(m_color1, m_color2, m_color3, m_nColors);
     memcpy(m_colors, curve.vertices, 3 * m_nColors * sizeof(float));
 }
 
